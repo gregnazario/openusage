@@ -2,8 +2,9 @@ import Foundation
 
 struct ZAIAuth: Hashable, Sendable {
     enum Source: Hashable, Sendable {
-        case environment
         case configFile
+        case keychain
+        case environment
     }
 
     var apiKey: String
@@ -19,7 +20,7 @@ enum ZAIAuthError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .missingKey:
-            return "No Z.ai API key. Set ZAI_API_KEY or add it to ~/.config/openusage/zai.json."
+            return "No Z.ai API key. Add it in Settings, store it in Keychain, or set ZAI_API_KEY."
         case .invalidKey:
             return "Z.ai API key invalid. Check your key at z.ai/manage-apikey/apikey-list."
         case .saveFailed:
@@ -32,12 +33,13 @@ enum ZAIAuthError: Error, LocalizedError, Equatable {
 
 /// Reads a [Z.ai](https://z.ai) (Zhipu AI) API key the user has already placed on the machine. Like
 /// OpenRouter, Z.ai has no companion CLI/app that stashes a credential in a known spot, so the key
-/// comes from an environment variable or a small config file. A GUI app launched from Finder/Dock
-/// doesn't inherit the interactive shell environment, so `ProcessEnvironmentReader` captures the
-/// login shell's environment at launch (see `LoginShellEnvironment`) — meaning an env var exported
-/// in a shell profile is honored even in a packaged build; the config file remains the explicit path.
+/// comes from a small config file, the macOS Keychain, or an environment variable. A GUI app launched
+/// from Finder/Dock doesn't inherit the interactive shell environment, so `ProcessEnvironmentReader`
+/// captures the login shell's environment at launch (see `LoginShellEnvironment`) — meaning an env var
+/// exported in a shell profile is honored even in a packaged build; the config file remains the
+/// explicit override path.
 ///
-/// `ZAI_API_KEY` is the primary name; `GLM_API_KEY` is accepted as a fallback (the older Zhipu name
+/// `ZAI_API_KEY` is the primary env name; `GLM_API_KEY` is accepted as a fallback (the older Zhipu name
 /// some users still export), mirroring the legacy plugin's lookup order.
 struct ZAIAuthStore: Sendable {
     /// Config files checked in order; first readable key wins. JSON (`apiKey` / `api_key` / `key`) or a
@@ -46,27 +48,35 @@ struct ZAIAuthStore: Sendable {
         "~/.config/openusage/zai.json",
         "~/.config/zai/key.json"
     ]
+    /// Keychain service names checked in order. `OpenUsage-zai` is the canonical service; the rest are
+    /// compatibility names from older local setups.
+    static let keychainServices = ["OpenUsage-zai", "ZAI_API_KEY", "GLM_API_KEY", "zai", "z.ai"]
     /// Environment variables checked in order. `ZAI_API_KEY` is current; `GLM_API_KEY` is the legacy
     /// Zhipu name some users still have exported.
     static let environmentNames = ["ZAI_API_KEY", "GLM_API_KEY"]
 
     var files: TextFileAccessing
     var environment: EnvironmentReading
+    var keychain: KeychainAccessing
 
     init(
         files: TextFileAccessing = LocalTextFileAccessor(),
-        environment: EnvironmentReading = ProcessEnvironmentReader()
+        environment: EnvironmentReading = ProcessEnvironmentReader(),
+        keychain: KeychainAccessing = SecurityKeychainAccessor()
     ) {
         self.files = files
         self.environment = environment
+        self.keychain = keychain
     }
 
-    /// Config file first, environment second — the order mirrors the legacy plugin and keeps a config
-    /// file the path a user edits to rotate or replace the key, so it wins over a stale env value an
-    /// old `launchctl setenv` may have left in the app's environment.
+    /// Config file first, Keychain second, environment third. The config path is the explicit override
+    /// Settings writes, so it wins over stale machine-level credentials.
     func loadAPIKey() -> ZAIAuth? {
         if let key = keyFromConfigFile() {
             return ZAIAuth(apiKey: key, source: .configFile)
+        }
+        if let key = keyFromKeychain() {
+            return ZAIAuth(apiKey: key, source: .keychain)
         }
         if let key = keyFromEnvironment() {
             return ZAIAuth(apiKey: key, source: .environment)
@@ -74,18 +84,18 @@ struct ZAIAuthStore: Sendable {
         return nil
     }
 
-    /// The effective key currently in use (config > env), surfaced for the Settings ▸ API Keys
-    /// reveal toggle. `nil` when no key is present.
+    /// The effective key currently in use (config > Keychain > env), surfaced for the Settings ▸ API
+    /// Keys reveal toggle. `nil` when no key is present.
     func currentAPIKey() -> String? {
         loadAPIKey()?.apiKey
     }
 
     /// Which combination of sources currently holds a key — drives the four-state API Keys card.
-    /// A saved key plus an env key is `overrideActive` because config wins, so the saved one overrides.
+    /// A saved key plus a Keychain/env key is `overrideActive` because config wins.
     func keyStatus() -> APIKeyStatus {
         let hasConfig = keyFromConfigFile() != nil
-        let hasEnv = keyFromEnvironment() != nil
-        switch (hasConfig, hasEnv) {
+        let hasExternal = keyFromKeychain() != nil || keyFromEnvironment() != nil
+        switch (hasConfig, hasExternal) {
         case (true, true): return .overrideActive
         case (true, false): return .saved
         case (false, true): return .fromEnvironment
@@ -94,7 +104,7 @@ struct ZAIAuthStore: Sendable {
     }
 
     /// Persist `key` to the primary config file the auth store already reads, as JSON
-    /// `{"apiKey":"…"}`. A saved key automatically wins over a stale env var (config is checked
+    /// `{"apiKey":"…"}`. A saved key automatically wins over a stale Keychain/env key (config is checked
     /// first), so this is also the "override" path. Empty input is rejected as `missingKey`.
     func saveAPIKey(_ key: String) throws {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -112,7 +122,7 @@ struct ZAIAuthStore: Sendable {
     /// Remove the saved key from every config file the auth store reads, so clearing truly clears
     /// the key — not just the primary file. Without this, a key held in the alternate config path
     /// (`~/.config/zai/key.json`) would resurface after the primary file is deleted, so the Settings
-    /// "clear" would appear not to work. A missing file is a no-op. If an env key remains,
+    /// "clear" would appear not to work. A missing file is a no-op. If a Keychain/env key remains,
     /// `keyStatus()` then reports `fromEnvironment` (the dashboard falls back to it on the next
     /// refresh).
     func deleteAPIKey() throws {
@@ -137,6 +147,18 @@ struct ZAIAuthStore: Sendable {
         return nil
     }
 
+    private func keyFromKeychain() -> String? {
+        for service in Self.keychainServices {
+            guard let raw = try? keychain.readGenericPassword(service: service),
+                  let apiKey = Self.apiKey(from: raw)
+            else {
+                continue
+            }
+            return apiKey
+        }
+        return nil
+    }
+
     private func keyFromConfigFile() -> String? {
         for path in Self.configPaths {
             guard files.exists(path), let text = try? files.readText(path) else { continue }
@@ -147,11 +169,19 @@ struct ZAIAuthStore: Sendable {
         return nil
     }
 
-    /// Accept a JSON object with `apiKey` / `api_key` / `key`, or a plain-text file holding only the key.
+    /// Accept a JSON object with `apiKey` / `api_key` / `key` / `token`, or a plain-text file holding
+    /// only the key.
     static func keyFromConfigText(_ text: String) -> String? {
-        if let data = text.data(using: .utf8),
+        apiKey(from: text)
+    }
+
+    static func apiKey(from raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let data = trimmed.data(using: .utf8),
            let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
-            for field in ["apiKey", "api_key", "key"] {
+            for field in ["apiKey", "api_key", "key", "token"] {
                 if let value = (object[field] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !value.isEmpty {
                     return value
@@ -161,7 +191,6 @@ struct ZAIAuthStore: Sendable {
         }
 
         // Not JSON: treat as a plain-text key file, ignoring blank lines.
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty || trimmed.contains("{") ? nil : trimmed
+        return trimmed.contains("{") ? nil : trimmed
     }
 }

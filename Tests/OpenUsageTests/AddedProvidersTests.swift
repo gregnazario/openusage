@@ -2,6 +2,23 @@ import XCTest
 @testable import OpenUsage
 
 final class AddedProvidersTests: XCTestCase {
+    func testZAIAuthPrefersKeychainOverEnvironment() {
+        let store = ZAIAuthStore(
+            files: FakeFiles(),
+            environment: FakeEnvironment(["ZAI_API_KEY": "env-key"]),
+            keychain: ServiceKeychain(values: ["OpenUsage-zai": "keychain-key"])
+        )
+
+        let auth = store.loadAPIKey()
+        XCTAssertEqual(auth?.apiKey, "keychain-key")
+        XCTAssertEqual(auth?.source, .keychain)
+    }
+
+    func testZAIAuthReadsJSONKeychainPayload() {
+        XCTAssertEqual(ZAIAuthStore.apiKey(from: #"{"apiKey":"json-key"}"#), "json-key")
+        XCTAssertEqual(ZAIAuthStore.apiKey(from: #"{"token":"token-key"}"#), "token-key")
+    }
+
     func testZAIMapsSessionWeeklyAndWebSearches() throws {
         let quota = jsonResponse([
             "data": [

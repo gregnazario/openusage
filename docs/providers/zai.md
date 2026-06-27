@@ -18,8 +18,10 @@ OpenUsage reads it from the first place it finds one, in this order:
 
 1. `~/.config/openusage/zai.json` — `{"apiKey":"…"}` (the file Settings writes to)
 2. `~/.config/zai/key.json`
-3. The `ZAI_API_KEY` environment variable
-4. The `GLM_API_KEY` environment variable (the legacy Zhipu name, still accepted)
+3. macOS Keychain service `OpenUsage-zai`
+4. Older Keychain service names: `ZAI_API_KEY`, `GLM_API_KEY`, `zai`, and `z.ai`
+5. The `ZAI_API_KEY` environment variable
+6. The `GLM_API_KEY` environment variable (the legacy Zhipu name, still accepted)
 
 You can also add and rotate the key from **Settings → API Keys** without touching a file. Either
 way, nothing leaves your Mac except the same API calls Z.ai's own subscription UI makes.
@@ -28,7 +30,11 @@ way, nothing leaves your Mac except the same API calls Z.ai's own subscription U
 
 1. [Subscribe to a GLM Coding plan](https://z.ai/subscribe) and get your API key from the
    [Z.ai console](https://z.ai/manage-apikey/apikey-list).
-2. Add the key to OpenUsage via **Settings → API Keys**, **or** export it:
+2. Add the key to OpenUsage via **Settings → API Keys**, store it in Keychain, or export it:
+
+```bash
+security add-generic-password -U -s OpenUsage-zai -w "YOUR_API_KEY"
+```
 
 ```bash
 export ZAI_API_KEY="YOUR_API_KEY"
