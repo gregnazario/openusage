@@ -729,6 +729,21 @@ final class LayoutStoreTests: XCTestCase {
         XCTAssertEqual(store.pinnedMetricIDs, expected)
     }
 
+    func testDefaultPinsIncludeRequestedToolbarProviders() {
+        let registry = WidgetRegistry.from([
+            CodexProvider(),
+            OpenCodeGoProvider(),
+            ZAIProvider()
+        ])
+        let store = LayoutStore(registry: registry, defaults: makeDefaults("RequestedToolbarPins"), storageKey: "layout")
+
+        XCTAssertEqual(store.pinnedMetricIDs, Set([
+            "codex.session",
+            "opencode-go.session",
+            "zai.session"
+        ]))
+    }
+
     func testUnpinningEverythingPersistsAndIsNotReseeded() {
         let defaults = makeDefaults("UnpinAll")
         let store = LayoutStore(registry: .mock, defaults: defaults, storageKey: "layout")

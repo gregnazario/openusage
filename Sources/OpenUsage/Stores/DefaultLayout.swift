@@ -57,16 +57,11 @@ enum DefaultLayout {
     ]
 
     /// Metrics pinned to the menu bar on first launch, so the app shows real numbers out of the box
-    /// instead of a lone icon. Two per provider for Claude, Codex, and Cursor - the per-provider cap
-    /// (`LayoutStore.maxPinsPerProvider`). Filtered to the active registry by `LayoutStore`, like `metricIDs`.
+    /// instead of a lone icon. Filtered to the active registry by `LayoutStore`, like `metricIDs`.
     static let pinnedMetricIDs: [String] = [
-        "antigravity.geminiPro",
-        "claude.session", "claude.weekly",
-        "codex.session", "codex.weekly",
-        "cursor.auto", "cursor.api",
-        "copilot.premium",
-        "openrouter.credits",
-        "zai.session", "zai.weekly"
+        "codex.session",
+        "zai.session",
+        "opencode-go.session"
     ]
 
     /// Metrics tucked below the per-provider "Shown on expand" divider on a fresh install. This is
