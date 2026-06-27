@@ -25,9 +25,13 @@ Either way, the app updates itself in place via signed, notarized [Sparkle](docs
 - **[Antigravity](docs/providers/antigravity.md)** — Gemini Pro/Flash and Claude model quotas
 - **[Claude](docs/providers/claude.md)** — session, weekly, Sonnet, extra usage, local daily spend (ccusage)
 - **[Codex](docs/providers/codex.md)** — session, weekly, credits, local daily spend (ccusage)
+- **[Copilot](docs/providers/copilot.md)** — premium, extra usage, chat, and free-tier completions quotas
 - **[Cursor](docs/providers/cursor.md)** — credits, total/auto/API usage, requests, on-demand, per-day spend
 - **[Devin](docs/providers/devin.md)** — weekly and daily quota, extra usage balance
+- **[Factory](docs/providers/factory.md)** — standard and premium Droid token usage
 - **[Grok](docs/providers/grok.md)** — credits used, pay-as-you-go
+- **[JetBrains AI Assistant](docs/providers/jetbrains-ai-assistant.md)** — local IDE quota cache
+- **[OpenCode Go](docs/providers/opencode-go.md)** — local observed OpenCode Go spend
 - **[OpenRouter](docs/providers/openrouter.md)** — credit balance, daily/weekly/monthly spend (API key)
 - **[Z.ai](docs/providers/zai.md)** — session, weekly, web-search quotas (GLM Coding Plan, API key)
 

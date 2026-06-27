@@ -22,8 +22,14 @@ enum DefaultLayout {
 
         "devin.daily", "devin.weekly", "devin.extra",
 
+        "factory.standard", "factory.premium",
+
         "grok.creditsUsed", "grok.trend",
         "grok.payAsYouGo", "grok.today", "grok.yesterday", "grok.last30",
+
+        "jetbrains-ai-assistant.quota", "jetbrains-ai-assistant.used", "jetbrains-ai-assistant.remaining",
+
+        "opencode-go.session", "opencode-go.weekly", "opencode-go.monthly",
 
         "openrouter.credits", "openrouter.balance",
         "openrouter.today", "openrouter.week", "openrouter.month", "openrouter.keyLimit",
@@ -51,9 +57,8 @@ enum DefaultLayout {
     ]
 
     /// Metrics pinned to the menu bar on first launch, so the app shows real numbers out of the box
-    /// instead of a lone icon. Two per provider for Claude, Codex, and Cursor — the per-provider cap
-    /// (`LayoutStore.maxPinsPerProvider`). Filtered to the active
-    /// registry by `LayoutStore`, like `metricIDs`.
+    /// instead of a lone icon. Two per provider for Claude, Codex, and Cursor - the per-provider cap
+    /// (`LayoutStore.maxPinsPerProvider`). Filtered to the active registry by `LayoutStore`, like `metricIDs`.
     static let pinnedMetricIDs: [String] = [
         "antigravity.geminiPro",
         "claude.session", "claude.weekly",
@@ -82,11 +87,14 @@ enum DefaultLayout {
         "cursor.onDemand", "cursor.requests", "cursor.credits",
         "cursor.today", "cursor.yesterday", "cursor.last30",
         // Copilot: Credits (the metered premium pool) + Extra Usage stay above the fold; Chat +
-        // Completions sit below the caret. They carry real counts on free only — on paid they're
+        // Completions sit below the caret. They carry real counts on free only - on paid they're
         // unlimited (suppressed), so they read "No data" there.
         "copilot.chat", "copilot.completions",
         "devin.extra",
+        "factory.premium",
         "grok.payAsYouGo", "grok.today", "grok.yesterday", "grok.last30",
+        "jetbrains-ai-assistant.used", "jetbrains-ai-assistant.remaining",
+        "opencode-go.monthly",
         // OpenRouter: Credits meter + Balance stay above the fold; period spend and the per-key cap
         // sit below the caret.
         "openrouter.today", "openrouter.week", "openrouter.month", "openrouter.keyLimit",

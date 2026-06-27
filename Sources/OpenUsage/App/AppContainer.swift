@@ -45,7 +45,10 @@ final class AppContainer {
             AntigravityProvider(),
             CopilotProvider(),
             DevinProvider(),
+            FactoryProvider(),
             GrokProvider(),
+            JetBrainsAIProvider(),
+            OpenCodeGoProvider(),
             OpenRouterProvider(),
             ZAIProvider()
         ]

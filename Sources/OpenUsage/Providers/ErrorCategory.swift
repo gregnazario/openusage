@@ -226,3 +226,42 @@ extension AntigravityError: CategorizedError {
         }
     }
 }
+
+extension OpenCodeGoError: CategorizedError {
+    var errorCategory: ErrorCategory {
+        switch self {
+        case .notDetected: .notLoggedIn
+        case .historyUnavailable: .notAvailable
+        }
+    }
+}
+
+extension JetBrainsAIError: CategorizedError {
+    var errorCategory: ErrorCategory {
+        switch self {
+        case .notDetected: .notLoggedIn
+        case .quotaUnavailable: .notAvailable
+        }
+    }
+}
+
+extension FactoryAuthError: CategorizedError {
+    var errorCategory: ErrorCategory {
+        switch self {
+        case .notLoggedIn: .notLoggedIn
+        case .invalidAuthFile: .authInvalid
+        case .sessionExpired: .authExpired
+        }
+    }
+}
+
+extension FactoryUsageError: CategorizedError {
+    var errorCategory: ErrorCategory {
+        switch self {
+        case .connectionFailed: .network
+        case .invalidResponse: .decoding
+        case .requestFailed(let status): ErrorCategory.http(status)
+        case .tokenExpired: .authExpired
+        }
+    }
+}

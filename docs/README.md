@@ -26,7 +26,10 @@ What each provider tracks, where its credentials come from, and what to do when 
 - [Copilot](providers/copilot.md)
 - [Cursor](providers/cursor.md)
 - [Devin](providers/devin.md)
+- [Factory](providers/factory.md)
 - [Grok](providers/grok.md)
+- [JetBrains AI Assistant](providers/jetbrains-ai-assistant.md)
+- [OpenCode Go](providers/opencode-go.md)
 - [OpenRouter](providers/openrouter.md)
 - [Z.ai](providers/zai.md)
 
