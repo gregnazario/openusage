@@ -25,3 +25,12 @@ Settings → Appearance → Menu Style:
 ## What the strip shows
 
 The strip only renders real data. A starred metric with nothing fetched yet is skipped; a provider whose stars all lack data disappears entirely (icon included). When nothing has data, the strip falls back to the app icon. Stars follow your Customize order — Always Visible metrics first, then On Demand ones. A metric can be starred whether it's Always Visible or On Demand.
+
+## Show in menu bar
+
+Settings ▸ Menu Bar lists every provider with a toggle that controls whether its stars render in the strip at all. Use it when you've starred a provider's metrics but want to mute that provider in the menu bar (a few too many providers crowded in, or you only want to track one in the strip):
+
+- **Off** removes the provider from the strip. Its current stars are remembered; re-enabling puts the same stars back — no re-starring required.
+- **On** (default for every provider) keeps its stars in the strip as usual.
+- Hiding a disabled provider still records the choice, so re-enabling the provider later doesn't suddenly add its stars back to the strip without your say-so.
+- Hiding and re-enabling is one undoable action, so ⌘Z inside Customize walks it back together with the rest of the layout.

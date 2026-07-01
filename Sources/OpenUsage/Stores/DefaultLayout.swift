@@ -64,6 +64,12 @@ enum DefaultLayout {
         "opencode-go.session"
     ]
 
+    /// Providers hidden from the menu bar on first launch. Empty by default — the default
+    /// `pinnedMetricIDs` set above is what a fresh install shows. Users add to this list from
+    /// Settings → Menu Bar; the entry is removed (and the remembered pins restored) when they
+    /// re-enable the provider. Filtered to the active registry by `LayoutStore`.
+    static let hiddenProviderIDs: [String] = []
+
     /// Metrics tucked below the per-provider "Shown on expand" divider on a fresh install. This is
     /// membership, not enablement: optional disabled rows like Sonnet or Cursor Requests/Credits are
     /// listed here so if the user enables them later they appear below the caret by default.

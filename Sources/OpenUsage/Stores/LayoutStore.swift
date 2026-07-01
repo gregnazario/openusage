@@ -72,6 +72,19 @@ final class LayoutStore {
     /// `canPin` to at most `maxPinsPerProvider` per provider (the strip stacks a provider's values in pairs).
     private(set) var pinnedMetricIDs: Set<String>
 
+    /// Provider ids whose pinned metrics are excluded from the menu bar strip. Hiding a provider
+    /// *remembers* its current pins in `hiddenProviderPins` and pulls them out of `pinnedMetricIDs` so
+    /// re-enabling restores the same set without the user re-starring. Membership only — the
+    /// remembered pins stay in the user's per-provider order; re-enable just moves them back.
+    private(set) var hiddenProviderIDs: Set<String>
+
+    /// Per-provider pin snapshot taken when the user hides a provider in the menu bar. Cleared when
+    /// the provider is re-shown (its pins rejoin `pinnedMetricIDs`) and on a full layout reset. Keyed
+    /// by provider id; value is the set of descriptor ids that were pinned at hide time. Re-enable
+    /// intersects with the current registry so a metric the provider no longer supports stays hidden
+    /// instead of being resurrected as a ghost pin.
+    private(set) var hiddenProviderPins: [String: Set<String>]
+
     /// Descriptor ids that sit below the per-provider "Shown on expand" divider: the dashboard hides
     /// them behind a caret until the user taps it, and Customize lists them under the divider.
     /// Membership only — the sequence within each section follows the provider's metric order, like
@@ -137,9 +150,12 @@ final class LayoutStore {
     private let expandOnEnableKey: String
     private let expandedProvidersKey: String
     private let menuBarStyleKey: String
+    private let hiddenProvidersKey: String
+    private let hiddenProviderPinsKey: String
     private let defaultMetricIDs: [String]
     private let migrationBaselineMetricIDs: [String]
     private let defaultPinnedMetricIDs: [String]
+    private let defaultHiddenProviderIDs: [String]
     private let defaultExpandedMetricIDs: [String]
     private var defaultExpandedOnEnableIDs: Set<String>
     private let isProviderEnabled: @MainActor (String) -> Bool
@@ -151,6 +167,7 @@ final class LayoutStore {
         defaultMetricIDs: [String] = DefaultLayout.metricIDs,
         migrationBaselineMetricIDs: [String] = DefaultLayout.migrationBaselineMetricIDs,
         defaultPinnedMetricIDs: [String] = DefaultLayout.pinnedMetricIDs,
+        defaultHiddenProviderIDs: [String] = DefaultLayout.hiddenProviderIDs,
         defaultExpandedMetricIDs: [String] = DefaultLayout.expandedMetricIDs,
         isProviderEnabled: @escaping @MainActor (String) -> Bool = { _ in true }
     ) {
@@ -165,9 +182,12 @@ final class LayoutStore {
         self.expandOnEnableKey = "\(storageKey).expandOnEnable"
         self.expandedProvidersKey = "\(storageKey).expandedProviders"
         self.menuBarStyleKey = "\(storageKey).menuBarStyle"
+        self.hiddenProvidersKey = "\(storageKey).menuBarHiddenProviders"
+        self.hiddenProviderPinsKey = "\(storageKey).menuBarHiddenProviderPins"
         self.defaultMetricIDs = defaultMetricIDs
         self.migrationBaselineMetricIDs = migrationBaselineMetricIDs
         self.defaultPinnedMetricIDs = defaultPinnedMetricIDs
+        self.defaultHiddenProviderIDs = defaultHiddenProviderIDs
         self.defaultExpandedMetricIDs = defaultExpandedMetricIDs
         self.isProviderEnabled = isProviderEnabled
 
@@ -214,6 +234,29 @@ final class LayoutStore {
             pinnedMetricIDs = Set(savedPins.filter { registry.descriptor(id: $0) != nil })
         } else {
             pinnedMetricIDs = Set(defaultPinnedMetricIDs.filter { registry.descriptor(id: $0) != nil })
+        }
+
+        // Providers the user has hidden from the menu bar. Default to the (typically empty) shipped set
+        // on first launch; a saved value is respected, including an empty one (the user hid everything).
+        if let savedHidden = defaults.stringArray(forKey: hiddenProvidersKey) {
+            hiddenProviderIDs = Set(savedHidden.filter { registry.provider(id: $0) != nil })
+        } else {
+            hiddenProviderIDs = Set(defaultHiddenProviderIDs.filter { registry.provider(id: $0) != nil })
+        }
+        // Remembered pin snapshot for each currently-hidden provider, restored when the user re-enables.
+        // Each value is a set of descriptor ids; cross-checked against the registry on load so a stale
+        // metric id from a removed provider doesn't sneak back in as a ghost pin on re-enable.
+        if let savedHiddenPins = Self.decodeStored([String: [String]].self, from: defaults, forKey: hiddenProviderPinsKey) {
+            var cleaned: [String: Set<String>] = [:]
+            for (providerID, ids) in savedHiddenPins where registry.provider(id: providerID) != nil {
+                let valid = ids.filter { registry.descriptor(id: $0) != nil }
+                if !valid.isEmpty {
+                    cleaned[providerID] = Set(valid)
+                }
+            }
+            hiddenProviderPins = cleaned
+        } else {
+            hiddenProviderPins = [:]
         }
 
         // Seed default expanded membership only on a genuinely fresh launch. An existing layout with no
@@ -318,6 +361,12 @@ final class LayoutStore {
     private func orderedProviders() -> [Provider] {
         orderedProviderIDs().compactMap { registry.provider(id: $0) }
     }
+
+    /// Public form of `orderedProviders()` so views that aren't the dashboard or Customize (e.g. the
+    /// Settings ▸ Menu Bar section) can list the same providers in the same order without depending
+    /// on Customize's enablement filter — the Settings list deliberately shows every provider the
+    /// user might want to hide, including ones currently disabled.
+    func providersInMenuBarOrder() -> [Provider] { orderedProviders() }
 
     /// Enabled (and provider-enabled) widgets grouped by provider, in the user's provider order, each
     /// provider's metrics kept in the provider's custom metric order. Drives the grouped dashboard list; providers with
@@ -461,7 +510,9 @@ final class LayoutStore {
             metricOrderByProvider: metricOrderByProvider,
             pinnedMetricIDs: pinnedMetricIDs,
             expandedMetricIDs: expandedMetricIDs,
-            defaultExpandedOnEnableIDs: defaultExpandedOnEnableIDs
+            defaultExpandedOnEnableIDs: defaultExpandedOnEnableIDs,
+            hiddenProviderIDs: hiddenProviderIDs,
+            hiddenProviderPins: hiddenProviderPins
         )
     }
 
@@ -507,12 +558,16 @@ final class LayoutStore {
         pinnedMetricIDs = snapshot.pinnedMetricIDs
         expandedMetricIDs = snapshot.expandedMetricIDs
         defaultExpandedOnEnableIDs = snapshot.defaultExpandedOnEnableIDs
+        hiddenProviderIDs = snapshot.hiddenProviderIDs
+        hiddenProviderPins = snapshot.hiddenProviderPins
         persist()
         persistProviderOrder()
         persistMetricOrder()
         persistPins()
         persistExpanded()
         persistExpandOnEnable()
+        persistHiddenProviders()
+        persistHiddenProviderPins()
     }
 
     /// Reorder whole providers when `dragged`'s header is dropped onto `target`'s. Works on the currently
@@ -850,12 +905,63 @@ final class LayoutStore {
         setPinned(!isPinned(descriptorID), for: descriptorID)
     }
 
+    // MARK: - Menu bar visibility
+
+    /// Whether the user has hidden this provider's pins from the menu bar strip. Hiding is independent
+    /// of the provider's enabled state: a disabled provider can't render anyway, but its hidden flag is
+    /// still remembered so re-enabling doesn't reappear its pins without the user's say-so.
+    func isProviderHiddenFromMenuBar(_ providerID: String) -> Bool {
+        hiddenProviderIDs.contains(providerID)
+    }
+
+    /// Show or hide a provider's pins in the menu bar strip.
+    ///
+    /// Hiding remembers the provider's currently-pinned descriptors in `hiddenProviderPins` and pulls
+    /// them out of the active `pinnedMetricIDs` set, so re-enabling restores the same stars instead of
+    /// dropping the user back to an empty strip for that provider. Re-showing moves the remembered
+    /// pins back into `pinnedMetricIDs`, intersected with the current registry so a metric the
+    /// provider no longer supports stays hidden rather than coming back as a ghost.
+    ///
+    /// The whole hide/show is one undoable action — undoing a hide restores both the visibility and the
+    /// original pin membership in a single step.
+    func setProviderHiddenFromMenuBar(_ providerID: String, hidden: Bool) {
+        guard registry.provider(id: providerID) != nil else { return }
+        guard hiddenProviderIDs.contains(providerID) != hidden else { return }
+        recordingUndoStep {
+            if hidden {
+                let ownedByProvider = pinnedMetricIDs.filter { descriptorID in
+                    registry.descriptor(id: descriptorID)?.providerID == providerID
+                }
+                if !ownedByProvider.isEmpty {
+                    hiddenProviderPins[providerID] = ownedByProvider
+                }
+                pinnedMetricIDs.subtract(ownedByProvider)
+                persistPins()
+                persistHiddenProviderPins()
+                hiddenProviderIDs.insert(providerID)
+                persistHiddenProviders()
+            } else {
+                let remembered = hiddenProviderPins.removeValue(forKey: providerID) ?? []
+                let stillValid = remembered.filter { registry.descriptor(id: $0) != nil }
+                if !stillValid.isEmpty {
+                    pinnedMetricIDs.formUnion(stillValid)
+                }
+                persistPins()
+                persistHiddenProviderPins()
+                hiddenProviderIDs.remove(providerID)
+                persistHiddenProviders()
+            }
+        }
+    }
+
     /// Pinned metrics grouped by provider, in the user's Customize order (provider order, then each
     /// provider's metric order). A temporarily disabled provider is excluded from the rendered groups
-    /// but keeps its pins. Drives the menu-bar strip.
+    /// but keeps its pins. A provider the user has hidden from the menu bar is also excluded — its
+    /// pins are still kept (`hiddenProviderPins` + the `pinnedMetricIDs` cleanup that hides the live set
+    /// so an id kept around can't accidentally sneak back). Drives the menu-bar strip.
     var pinnedGroups: [ProviderMetrics] {
         orderedProviders().compactMap { provider in
-            guard isProviderEnabled(provider.id) else { return nil }
+            guard isProviderEnabled(provider.id), !hiddenProviderIDs.contains(provider.id) else { return nil }
             // Keep the strip order matching Customize: always-shown pins first, then expanded ones.
             let metrics = orderedSupportedMetrics(for: provider.id).filter { pinnedMetricIDs.contains($0.id) }
             return metrics.isEmpty ? nil : ProviderMetrics(
@@ -873,6 +979,20 @@ final class LayoutStore {
 
     private func persistPins() {
         defaults.set(Array(pinnedMetricIDs), forKey: pinsKey)
+    }
+
+    private func persistHiddenProviders() {
+        defaults.set(Array(hiddenProviderIDs), forKey: hiddenProvidersKey)
+    }
+
+    /// Persist the remembered pin snapshot for hidden providers as a JSON object keyed by provider id
+    /// (each value a sorted array of descriptor ids), so the on-disk shape matches the in-memory `[String:
+    /// Set<String>]` and round-trips through `JSONEncoder`/`JSONDecoder` cleanly. `persistEncodable`
+    /// already handles encode errors loudly via the same `AppLog.warn(.config, …)` channel the other
+    /// layout keys use.
+    private func persistHiddenProviderPins() {
+        let payload = hiddenProviderPins.mapValues { Array($0).sorted() }
+        persistEncodable(payload, forKey: hiddenProviderPinsKey)
     }
 
     private func persistExpanded() {
@@ -924,6 +1044,13 @@ final class LayoutStore {
         persistExpandOnEnable()
         expandedProviderIDs = []
         persistExpandedProviders()
+        // A full reset returns the menu-bar visibility to the shipped default. Any provider the user
+        // had hidden (and the pins we'd been remembering for it) is dropped — a fresh install should
+        // show the default set of pins, not a phantom of the previous user's choices.
+        hiddenProviderIDs = Set(defaultHiddenProviderIDs.filter { registry.provider(id: $0) != nil })
+        hiddenProviderPins = [:]
+        persistHiddenProviders()
+        persistHiddenProviderPins()
         persistSeededDefaults(Set(Self.knownMetricIDs(defaultMetricIDs, registry: registry)))
         persist()
     }
@@ -971,6 +1098,16 @@ final class LayoutStore {
         // Default is a collapsed card.
         if expandedProviderIDs.remove(providerID) != nil {
             persistExpandedProviders()
+        }
+
+        // Resetting a provider implies "start over with this one" — clear its menu-bar hide flag and
+        // any pins we'd been remembering for it, so the user sees the provider's default state in
+        // the strip and isn't surprised by a hidden provider that suddenly pops back.
+        if hiddenProviderIDs.remove(providerID) != nil {
+            persistHiddenProviders()
+        }
+        if hiddenProviderPins.removeValue(forKey: providerID) != nil {
+            persistHiddenProviderPins()
         }
 
         syncPlacedOrder() // persists `placed`

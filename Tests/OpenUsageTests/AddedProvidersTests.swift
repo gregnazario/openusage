@@ -29,13 +29,9 @@ final class AddedProvidersTests: XCTestCase {
                 ]
             ]
         ])
-        let subscription = ZAISubscriptionResponse(statusCode: 200, body: jsonData(["data": [["productName": "GLM Coding Max"]]]))
+        let subscriptionBody = jsonData(["data": [["productName": "GLM Coding Max"]]])
 
-        let mapped = try ZAIUsageMapper.map(
-            subscription: subscription,
-            quota: quota,
-            now: Date(timeIntervalSince1970: 1_760_000_000)
-        )
+        let mapped = ZAIUsageMapper.map(quotaBody: quota.body, subscriptionBody: subscriptionBody)
 
         XCTAssertEqual(mapped.plan, "GLM Coding Max")
         XCTAssertEqual(mapped.lines.progressUsed("Session"), 10)

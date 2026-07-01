@@ -2,6 +2,14 @@
 
 Settings lives inside the popover — there is no separate window. Open it from the footer's **Settings** button, with ⌘, while the popover is showing, or by right-clicking the menu bar icon and choosing Settings. The dashboard slides over to the Settings screen, which carries a back button in its top-left corner. Go back with that button, the ⌘, shortcut, or Esc (Esc always backs out to the dashboard first — pressing it again closes the popover).
 
+## Menu Bar
+
+Per-provider toggles for which providers' starred metrics render in the macOS menu bar strip. See [Menu bar](menu-bar.md#show-in-menu-bar).
+
+| Setting | Options | What it does |
+|---|---|---|
+| Show in menu bar (per provider) | On / Off | On (default for every provider) keeps the provider's stars in the strip. Off hides them; the provider's current stars are remembered and reappear when you turn it back on, so you don't have to re-star. |
+
 ## Startup
 
 | Setting | Options | What it does |

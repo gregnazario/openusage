@@ -49,6 +49,7 @@ struct SettingsScreen: View {
         @Bindable var notifications = container.notificationSettings
         // Same section rhythm as the dashboard and Customize (all read the density setting).
         return VStack(alignment: .leading, spacing: density.sectionSpacing) {
+            menuBarSection
             section("General") {
                 row("Launch at Login") {
                     Toggle("", isOn: $launchAtLogin)
@@ -367,6 +368,49 @@ struct SettingsScreen: View {
         }
         .glassButtonStyle()
         .controlSize(.regular)
+        .padding(.horizontal, 12)
+        .padding(.vertical, density.controlRowPadding)
+    }
+
+    // MARK: - Menu Bar visibility
+
+    /// Settings ▸ Menu Bar: a per-provider toggle for which providers' pins render in the macOS menu
+    /// bar strip. Pinning controls live in the Customize screen and on each row's context menu — this
+    /// section is the higher-order "do I want this provider in the strip at all" choice, independent
+    /// of which specific metrics are starred. Hiding a provider remembers its current pins and pulls
+    /// them out of the active set so re-enabling restores the same stars without the user re-starring.
+    ///
+    /// Uses the same provider order as Customize (registry order, then any user-saved reordering) so
+    /// the list reads in the same sequence users find in the rest of the app. Disabled providers
+    /// still appear here so the user can pre-hide them in case they re-enable the provider later —
+    /// the `setProviderHiddenFromMenuBar` seam is provider-id-only, not enablement-aware, on purpose
+    /// (a provider's enablement is orthogonal to its menu-bar visibility).
+    private var menuBarSection: some View {
+        @Bindable var layout = container.layout
+        let providers = container.layout.providersInMenuBarOrder()
+        return section("Menu Bar") {
+            ForEach(providers) { provider in
+                menuBarProviderRow(provider: provider, isHidden: layout.isProviderHiddenFromMenuBar(provider.id))
+            }
+        }
+    }
+
+    /// One row in the Menu Bar section: the provider's monochrome mark, its display name, and a
+    /// trailing toggle. Mirrors the rhythm of the existing Settings rows (same padding, same toggle
+    /// style) but renders a view for the label so the mark can sit next to the name — the same idiom
+    /// the Customize provider list uses.
+    private func menuBarProviderRow(provider: Provider, isHidden: Bool) -> some View {
+        HStack(spacing: 10) {
+            ProviderIcon(source: provider.icon)
+                .frame(width: 18, height: 18)
+            Text(provider.displayName)
+            Spacer(minLength: 8)
+            Toggle("", isOn: Binding(
+                get: { !isHidden },
+                set: { container.layout.setProviderHiddenFromMenuBar(provider.id, hidden: !$0) }
+            ))
+            .settingsSwitchStyle()
+        }
         .padding(.horizontal, 12)
         .padding(.vertical, density.controlRowPadding)
     }

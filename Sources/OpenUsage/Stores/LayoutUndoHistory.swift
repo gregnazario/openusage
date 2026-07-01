@@ -14,6 +14,8 @@ struct LayoutSnapshot: Equatable {
     let pinnedMetricIDs: Set<String>
     let expandedMetricIDs: Set<String>
     let defaultExpandedOnEnableIDs: Set<String>
+    let hiddenProviderIDs: Set<String>
+    let hiddenProviderPins: [String: Set<String>]
 }
 
 /// A small, bounded undo stack of `LayoutSnapshot`s — the machinery behind `LayoutStore`'s app-wide
