@@ -104,11 +104,11 @@ enum ZAIUsageMapper {
     }
 
     /// Resolve a `(unit, number)` window to milliseconds. `unit` is Z.ai's internal time-unit code.
+    /// `number` is optional in the wild (the legacy plugin classified on `unit` alone) — a missing
+    /// `number` reads as 1, so `unit` still decides session-vs-weekly for those payloads.
     private static func periodDurationMs(for entry: [String: Any]) -> Int? {
-        guard let unit = ProviderParse.number(entry["unit"]),
-              let number = ProviderParse.number(entry["number"]) else {
-            return nil
-        }
+        guard let unit = ProviderParse.number(entry["unit"]) else { return nil }
+        let number = ProviderParse.number(entry["number"]) ?? 1
         let unitMs: Double
         switch unit {
         case 3: unitMs = 60 * 60 * 1000           // hours

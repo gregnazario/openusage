@@ -100,11 +100,11 @@ final class LayoutStoreTests: XCTestCase {
         XCTAssertFalse(store.isPinned("cursor.usage"), "undo reverses a pin")
 
         // Unpin a default-pinned metric, then undo → back to pinned.
-        XCTAssertTrue(store.isPinned("claude.session"))
-        store.setPinned(false, for: "claude.session")
-        XCTAssertFalse(store.isPinned("claude.session"))
+        XCTAssertTrue(store.isPinned("codex.session"))
+        store.setPinned(false, for: "codex.session")
+        XCTAssertFalse(store.isPinned("codex.session"))
         XCTAssertTrue(store.undo())
-        XCTAssertTrue(store.isPinned("claude.session"), "undo reverses an unpin")
+        XCTAssertTrue(store.isPinned("codex.session"), "undo reverses an unpin")
     }
 
     func testUndoReversesExpandedMove() {
@@ -732,6 +732,7 @@ final class LayoutStoreTests: XCTestCase {
     func testDefaultPinsIncludeRequestedToolbarProviders() {
         let registry = WidgetRegistry.from([
             CodexProvider(),
+            GrokProvider(),
             OpenCodeGoProvider(),
             ZAIProvider()
         ])
@@ -739,6 +740,7 @@ final class LayoutStoreTests: XCTestCase {
 
         XCTAssertEqual(store.pinnedMetricIDs, Set([
             "codex.session",
+            "grok.creditsUsed",
             "opencode-go.session",
             "zai.session"
         ]))

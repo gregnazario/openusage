@@ -106,7 +106,7 @@ final class AddedProvidersTests: XCTestCase {
         ])
         let paidMapped = try CopilotUsageMapper.map(paid)
         XCTAssertEqual(paidMapped.plan, "Business Plus")
-        XCTAssertEqual(paidMapped.lines.progressUsed("Premium"), 20)
+        XCTAssertEqual(paidMapped.lines.progressUsed("Credits"), 20)
         XCTAssertEqual(paidMapped.lines.progressUsed("Chat"), 5)
 
         let free = jsonResponse([

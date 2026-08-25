@@ -60,8 +60,9 @@ enum DefaultLayout {
     /// instead of a lone icon. Filtered to the active registry by `LayoutStore`, like `metricIDs`.
     static let pinnedMetricIDs: [String] = [
         "codex.session",
-        "zai.session",
-        "opencode-go.session"
+        "grok.creditsUsed",
+        "opencode-go.session",
+        "zai.session"
     ]
 
     /// Providers hidden from the menu bar on first launch. Empty by default — the default
