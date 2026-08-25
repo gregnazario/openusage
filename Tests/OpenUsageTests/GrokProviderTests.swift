@@ -90,6 +90,31 @@ final class GrokUsageMapperTests: XCTestCase {
         XCTAssertEqual(badge(mapped.lines, "Pay as you go")?.text, "Disabled")
         XCTAssertEqual(badge(mapped.lines, "Pay as you go")?.colorHex, "#a3a3a3")
     }
+
+    func testMapsZeroMonthlyLimitAsNoCreditsWarning() throws {
+        // Real payload shape since 2026-08 (e.g. X Premium+): 0 used / 0 monthlyLimit / 0 cap.
+        // Previously threw `invalidResponse` ("Grok billing response changed.") and froze the
+        // card on a stale snapshot; must now carry a soft warning, drop the percent meter (the
+        // menu-bar pin has no data, so Grok leaves the strip), and keep the Disabled badge.
+        let body: [String: Any] = [
+            "config": [
+                "used": ["val": 0],
+                "monthlyLimit": ["val": 0],
+                "onDemandCap": ["val": 0],
+                "billingPeriodStart": "2026-08-01T00:00:00+00:00",
+                "billingPeriodEnd": "2026-09-01T00:00:00+00:00"
+            ]
+        ]
+        let mapped = try GrokUsageMapper.mapBillingResponse(HTTPResponse(
+            statusCode: 200,
+            headers: [:],
+            body: try JSONSerialization.data(withJSONObject: body)
+        ))
+
+        XCTAssertEqual(mapped.warning, "No coding credits included on this plan")
+        XCTAssertNil(progress(mapped.lines, "Credits used"))
+        XCTAssertEqual(badge(mapped.lines, "Pay as you go")?.text, "Disabled")
+    }
 }
 
 final class GrokLogUsageScannerTests: XCTestCase {

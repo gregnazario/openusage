@@ -2,6 +2,9 @@ import Foundation
 
 struct GrokMappedUsage: Equatable, Sendable {
     var lines: [MetricLine]
+    /// Soft header notice carried alongside real lines (e.g. plans with no coding credits) —
+    /// rendered as the card's amber triangle without failing the refresh.
+    var warning: String? = nil
 }
 
 enum GrokUsageMapper {
@@ -14,9 +17,7 @@ enum GrokUsageMapper {
         guard let body = ProviderParse.jsonObject(response.body),
               let config = body["config"] as? [String: Any],
               let usedUnits = unitsValue(config["used"]),
-              let limitUnits = unitsValue(config["monthlyLimit"]),
-              limitUnits > 0,
-              let resetsAt = resetDate(config["billingPeriodEnd"])
+              let limitUnits = unitsValue(config["monthlyLimit"])
         else {
             throw GrokUsageError.invalidResponse
         }
@@ -25,9 +26,23 @@ enum GrokUsageMapper {
         // missing/non-numeric cap as 0 → the "Disabled" badge below, instead of failing the whole
         // guard and surfacing a misleading "Grok billing response changed." A present cap of 0
         // already mapped to Disabled and still does.
-        // NOTE: free-tier accounts (monthlyLimit == 0) still throw `invalidResponse` here — that
-        // payload shape is unconfirmed; revisit with a real sample before relaxing `limitUnits > 0`.
         let onDemandCapUnits = unitsValue(config["onDemandCap"]) ?? 0
+
+        // A `monthlyLimit` of 0 is a real account state, not a broken payload: plans without
+        // included coding credits (e.g. X Premium+ since 2026-08) report 0/0. A percent meter
+        // would divide by zero and the old guard mislabeled this "response changed" — instead,
+        // warn on the card header and keep only the badge, so the local-log spend rows still
+        // render and the menu bar drops the meaningless meter.
+        if limitUnits <= 0 {
+            return GrokMappedUsage(
+                lines: [payAsYouGoBadge(cap: onDemandCapUnits)],
+                warning: "No coding credits included on this plan"
+            )
+        }
+
+        guard let resetsAt = resetDate(config["billingPeriodEnd"]) else {
+            throw GrokUsageError.invalidResponse
+        }
 
         let usedPercent = ProviderParse.clampPercent((usedUnits / limitUnits) * 100)
         return GrokMappedUsage(lines: [
@@ -38,11 +53,7 @@ enum GrokUsageMapper {
                 format: .percent,
                 resetsAt: resetsAt
             ),
-            .badge(
-                label: "Pay as you go",
-                text: onDemandCapUnits > 0 ? "\(formatUnits(onDemandCapUnits)) cap" : "Disabled",
-                colorHex: onDemandCapUnits > 0 ? "#22c55e" : "#a3a3a3"
-            )
+            payAsYouGoBadge(cap: onDemandCapUnits)
         ])
     }
 
@@ -64,6 +75,14 @@ enum GrokUsageMapper {
             return nil
         }
         return number.isFinite ? number : nil
+    }
+
+    private static func payAsYouGoBadge(cap: Double) -> MetricLine {
+        .badge(
+            label: "Pay as you go",
+            text: cap > 0 ? "\(formatUnits(cap)) cap" : "Disabled",
+            colorHex: cap > 0 ? "#22c55e" : "#a3a3a3"
+        )
     }
 
     private static func resetDate(_ value: Any?) -> Date? {

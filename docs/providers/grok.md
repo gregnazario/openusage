@@ -22,6 +22,7 @@ Today / Yesterday / Last 30 Days are computed **locally** from the Grok CLI's lo
 ## Troubleshooting
 
 - **"Session expired" / auth errors** — run `grok login` again, then refresh.
+- **"No coding credits included on this plan"** — your subscription (e.g. X Premium+) carries no monthly coding credits, so there is no percentage meter to show. The local spend tiles and pay-as-you-go status still work.
 - **Spend tiles show "No data"** — they need the Grok CLI's log at `~/.grok/logs/unified.jsonl`; older CLI versions logged no token counts. Run a Grok CLI session to populate it, then refresh.
 
 ## Under the hood

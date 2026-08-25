@@ -81,7 +81,7 @@ final class GrokProvider: ProviderRuntime {
                                              note: "Estimated from local logs at API rates")
         }
 
-        return ProviderSnapshot.make(provider: provider, plan: plan, lines: mapped.lines, refreshedAt: now())
+        return ProviderSnapshot.make(provider: provider, plan: plan, lines: mapped.lines, refreshedAt: now(), warning: mapped.warning)
     }
 
     private func fetchBillingWithRetry(accessToken: String, state: inout GrokAuthState) async throws -> HTTPResponse {
